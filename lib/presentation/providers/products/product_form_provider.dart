@@ -1,0 +1,188 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
+import '../../../core/common/result.dart';
+import '../../../core/utilities/console_logger.dart';
+import '../../../domain/entities/product_entity.dart';
+import '../../../domain/repositories/product_repository.dart';
+import '../../../domain/repositories/storage_repository.dart';
+import '../../../domain/usecases/product_usecases.dart';
+import '../../../domain/usecases/storage_usecases.dart';
+import '../auth/auth_provider.dart';
+import 'products_provider.dart';
+
+class ProductFormProvider extends ChangeNotifier {
+  final AuthProvider authProvider;
+  final ProductRepository productRepository;
+  final StorageRepository storageRepository;
+  final ProductsProvider productsProvider;
+
+  ProductFormProvider({
+    required this.authProvider,
+    required this.productRepository,
+    required this.storageRepository,
+    required this.productsProvider,
+  });
+
+  File? imageFile;
+  String? imageUrl;
+  String? name;
+  bool? isAvailable;
+  int? price;
+  String? description;
+  int? categoryId;
+
+  bool isLoaded = false;
+
+  Future<void> initProductForm(int? productId) async {
+    if (productId == null) {
+      isLoaded = true;
+      isAvailable = true;
+      categoryId = null;
+      notifyListeners();
+      return;
+    }
+
+    var res = await GetProductUsecase(productRepository).call(productId);
+
+    if (res.isSuccess) {
+      var product = res.data;
+
+      imageUrl = product?.imageUrl;
+      name = product?.name;
+      price = product?.price;
+      description = product?.description;
+      isAvailable = product?.isAvailable ?? true;
+      categoryId = product?.categoryId;
+
+      isLoaded = true;
+      notifyListeners();
+    } else {
+      throw res.error ?? 'Failed to load data';
+    }
+  }
+
+  Future<Result<int>> createProduct() async {
+    try {
+      var userId = authProvider.user?.id;
+      if (userId == null) throw 'Unathenticated!';
+
+      if (imageFile != null) {
+        final res = await UploadProductImageUsecase(storageRepository).call(imageFile!.path);
+        imageUrl = res.data;
+      }
+
+      cl('imageUrl $imageUrl');
+
+      var product = ProductEntity(
+        createdById: userId,
+        categoryId: categoryId,
+        name: name ?? '',
+        imageUrl: imageUrl ?? '',
+        isAvailable: isAvailable ?? true,
+        price: price ?? 0,
+        description: description ?? '',
+      );
+
+      var res = await CreateProductUsecase(productRepository).call(product);
+
+      // Refresh products
+      productsProvider.getAllProducts();
+
+      return res;
+    } catch (e) {
+      return Result.failure(error: e);
+    }
+  }
+
+  Future<Result<void>> updatedProduct(int id) async {
+    try {
+      var userId = authProvider.user?.id;
+      if (userId == null) throw 'Unathenticated!';
+
+      if (imageFile != null) {
+      final res = await UploadProductImageUsecase(storageRepository).call(imageFile!.path);
+      if (res.isSuccess) {
+        imageUrl = res.data;
+      } else {
+        throw res.error ?? 'Failed to upload new image';
+      }
+    }
+
+      cl('imageUrl $imageUrl');
+
+      var product = ProductEntity(
+        id: id,
+        createdById: userId,
+        categoryId: categoryId,
+        name: name!,
+        imageUrl: imageUrl ?? '',
+        isAvailable: isAvailable ?? false,
+        price: price ?? 0,
+        description: description ?? '',
+      );
+
+      var res = await UpdateProductUsecase(productRepository).call(product);
+
+      // Refresh products
+      productsProvider.getAllProducts();
+
+      return res;
+    } catch (e) {
+      return Result.failure(error: e);
+    }
+  }
+
+  Future<Result<void>> deleteProduct(int id) async {
+    try {
+      var res = await DeleteProductUsecase(productRepository).call(id);
+
+      // Refresh products
+      productsProvider.getAllProducts();
+
+      return res;
+    } catch (e) {
+      return Result.failure(error: e);
+    }
+  }
+
+  void onChangedImage(File value) {
+    imageFile = value;
+    notifyListeners();
+  }
+
+  void onChangedName(String value) {
+    name = value;
+    notifyListeners();
+  }
+
+  void onChangedPrice(String value) {
+    price = int.tryParse(value);
+    notifyListeners();
+  }
+
+  void onChangedDesc(String value) {
+    description = value;
+    notifyListeners();
+  }
+  
+  void onChangedIsAvailable(bool value) {
+    isAvailable = value;
+    notifyListeners();
+  }
+  
+  void onChangedCategory(int value) {
+    categoryId = value;
+    notifyListeners();
+  }
+
+  bool isFormValid() {
+    List validator = [
+      name?.isNotEmpty,
+      (price ?? 0) > 0,
+    ];
+
+    return !validator.contains(false);
+  }
+}
