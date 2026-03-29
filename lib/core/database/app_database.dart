@@ -60,7 +60,7 @@ class AppDatabase {
       
       if (existing.isEmpty) {
         cl("Seeding initial categories...");
-        final List<String> initialCategories = ['Paket Bakso', 'Minuman', 'Addon', 'Gorengan', 'Lainnya'];
+        final List<String> initialCategories = ['Paket Bakso', 'Bakso Plecing', 'Minuman', 'Addon', 'Gorengan', 'Lainnya'];
         
         for (var name in initialCategories) {
           await database.insert(DatabaseConfig.categoryTableName, {
