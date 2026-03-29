@@ -70,7 +70,7 @@ class DateTimeFormatter {
       return '(Invalid date format)';
     }
 
-    return DateFormat('dd/MM/y • HH:mm').format(parsedDate);
+    return DateFormat('dd/MM/y - HH:mm').format(parsedDate);
   }
 
   static String slashDateShortedYearWithClock(String iso8601String) {

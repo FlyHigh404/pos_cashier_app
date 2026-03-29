@@ -11,7 +11,7 @@ class ThemeProvider extends ChangeNotifier {
 
   ThemeData get theme {
     final value = _sharedPreferences.getString(Constants.selectedBrightnessKey);
-    var brightness = value == 'light' ? Brightness.light : Brightness.dark;
+    var brightness = value == 'dark' ? Brightness.dark : Brightness.light;
     return AppTheme().init(brightness: brightness);
   }
 
