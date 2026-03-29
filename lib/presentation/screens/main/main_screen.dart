@@ -33,17 +33,46 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final isHasInternet = ref.watch(mainControllerProvider.select((p) => p.isHasInternet));
     final user = ref.watch(mainControllerProvider.select((p) => p.user));
 
-    // Display RootScreen when data is being load
+    final authProvider = ref.read(authControllerProvider);
+
     if (!isLoaded) {
       return const WelcomeScreen();
     }
-
-    // User data might still null for the first time app open or login without internet connection
-    // So, throw error with a first time internet error message then the [ErrorScreen] will be shown
     if (isLoaded && user == null && !isHasInternet) {
-      throw Exception(
-        'Tidak ada koneksi internet! Silahkan periksa koneksi internet Anda. Internet diperlukan untuk sesi login.',
-      );
+      if (!authProvider.isAuthenticated) {
+        return Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.signal_wifi_off_rounded,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Mode Offline Tidak Tersedia',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Koneksi internet diperlukan untuk login pertama kali. Silakan hidupkan Wi-Fi atau data seluler Anda.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     final location = GoRouterState.of(context).uri.path;

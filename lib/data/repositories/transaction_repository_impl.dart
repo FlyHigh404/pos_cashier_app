@@ -24,6 +24,19 @@ class TransactionRepositoryImpl extends TransactionRepository {
     required this.queuedActionLocalDatasource,
   });
 
+  Future<void> _queueTransactionAction(String method, String param) async {
+    await queuedActionLocalDatasource.createQueuedAction(
+      QueuedActionModel(
+        id: DateTime.now().millisecondsSinceEpoch,
+        repository: 'TransactionRepositoryImpl',
+        method: method,
+        param: param,
+        isCritical: true,
+        createdAt: DateTime.now().toIso8601String(),
+      ),
+    );
+  }
+
   @override
   Future<Result<int>> syncAllUserTransactions(String userId) async {
     try {
@@ -59,6 +72,7 @@ class TransactionRepositoryImpl extends TransactionRepository {
     String? contains,
   }) async {
     try {
+      
       var local = await transactionLocalDatasource.getUserTransactions(
         userId,
         orderBy: orderBy,
@@ -140,27 +154,43 @@ class TransactionRepositoryImpl extends TransactionRepository {
   @override
   Future<Result<int>> createTransaction(TransactionEntity transaction) async {
     try {
+      
       var data = TransactionModel.fromEntity(transaction);
+      data.status = 'success';
+
+      if (data.id == null || data.id == 0 || data.id.toString().length > 12) {
+        final now = DateTime.now();
+
+        final datePrefix = '${now.year}'
+            '${now.month.toString().padLeft(2, '0')}'
+            '${now.day.toString().padLeft(2, '0')}';
+
+        final countToday = await transactionLocalDatasource.getTodayTransactionCount();
+        final sequenceNumber = countToday + 1;
+        
+        final sequenceString = sequenceNumber.toString().padLeft(4, '0');
+        
+        final newIdString = '$datePrefix$sequenceString';
+        data.id = int.parse(newIdString);
+      }
 
       var local = await transactionLocalDatasource.createTransaction(data);
       if (local.isFailure) return Result.failure(error: local.error!);
 
-      if (await pingService.isConnected) {
-        final remote = await transactionRemoteDatasource.createTransaction(data);
-        if (remote.isFailure) return Result.failure(error: remote.error!);
-      } else {
-        final res = await queuedActionLocalDatasource.createQueuedAction(
-          QueuedActionModel(
-            id: DateTime.now().millisecondsSinceEpoch,
-            repository: 'TransactionRepositoryImpl',
-            method: 'createTransaction',
-            param: jsonEncode((data).toJson()),
-            isCritical: true,
-            createdAt: DateTime.now().toIso8601String(),
-          ),
-        );
+      final localTransactionId = local.data!;
+      final jsonString = jsonEncode(data.toJson());
+      final jsonMap = jsonDecode(jsonString) as Map<String, dynamic>;
+      jsonMap['id'] = localTransactionId; // Inject the new SQLite ID
+      
+      final dataWithId = TransactionModel.fromJson(jsonMap);
 
-        if (res.isFailure) return Result.failure(error: res.error!);
+      if (await pingService.isConnected) {
+        final remote = await transactionRemoteDatasource.createTransaction(dataWithId);
+        if (remote.isFailure) {
+          await _queueTransactionAction('createTransaction', jsonEncode(dataWithId.toJson()));
+        }
+      } else {
+        await _queueTransactionAction('createTransaction', jsonEncode(dataWithId.toJson()));
       }
 
       return Result.success(data: local.data!);
@@ -177,20 +207,32 @@ class TransactionRepositoryImpl extends TransactionRepository {
 
       if (await pingService.isConnected) {
         final remote = await transactionRemoteDatasource.deleteTransaction(transactionId);
-        if (remote.isFailure) return Result.failure(error: remote.error!);
+        if (remote.isFailure) {
+          await _queueTransactionAction('deleteTransaction', transactionId.toString());
+        }
       } else {
-        final res = await queuedActionLocalDatasource.createQueuedAction(
-          QueuedActionModel(
-            id: DateTime.now().millisecondsSinceEpoch,
-            repository: 'TransactionRepositoryImpl',
-            method: 'deleteTransaction',
-            param: transactionId.toString(),
-            isCritical: true,
-            createdAt: DateTime.now().toIso8601String(),
-          ),
-        );
+        await _queueTransactionAction('deleteTransaction', transactionId.toString());
+      }
 
-        if (res.isFailure) return Result.failure(error: res.error!);
+      return Result.success(data: null);
+    } catch (e) {
+      return Result.failure(error: e);
+    }
+  }
+
+  @override
+  Future<Result<void>> softDeleteTransaction(int transactionId) async {
+    try {
+      final local = await transactionLocalDatasource.softDeleteTransaction(transactionId);
+      if (local.isFailure) return Result.failure(error: local.error!);
+
+      if (await pingService.isConnected) {
+        final remote = await transactionRemoteDatasource.softDeleteTransaction(transactionId);
+        if (remote.isFailure) {
+          await _queueTransactionAction('softDeleteTransaction', transactionId.toString());
+        }
+      } else {
+        await _queueTransactionAction('softDeleteTransaction', transactionId.toString());
       }
 
       return Result.success(data: null);
@@ -209,20 +251,11 @@ class TransactionRepositoryImpl extends TransactionRepository {
 
       if (await pingService.isConnected) {
         final remote = await transactionRemoteDatasource.updateTransaction(data);
-        if (remote.isFailure) return Result.failure(error: remote.error!);
+        if (remote.isFailure) {
+          await _queueTransactionAction('updateTransaction', jsonEncode(data.toJson()));
+        }
       } else {
-        final res = await queuedActionLocalDatasource.createQueuedAction(
-          QueuedActionModel(
-            id: DateTime.now().millisecondsSinceEpoch,
-            repository: 'TransactionRepositoryImpl',
-            method: 'updateTransaction',
-            param: jsonEncode(data.toJson()),
-            isCritical: true,
-            createdAt: DateTime.now().toIso8601String(),
-          ),
-        );
-
-        if (res.isFailure) return Result.failure(error: res.error!);
+        await _queueTransactionAction('updateTransaction', jsonEncode(data.toJson()));
       }
 
       return Result.success(data: null);

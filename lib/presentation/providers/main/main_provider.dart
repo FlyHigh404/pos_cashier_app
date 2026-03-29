@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../../core/services/connectivity/ping_service.dart';
 import '../../../core/services/info/device_info_service.dart';
@@ -47,6 +49,7 @@ class MainProvider extends ChangeNotifier {
   bool isSyncronizing = false;
 
   UserEntity? user;
+  Timer? _watchdogTimer;
 
   Future<void> initMainProvider() async {
     startPingService();
@@ -55,13 +58,29 @@ class MainProvider extends ChangeNotifier {
   }
 
   Future<void> startPingService() async {
-    // Note: The ICMP protocol may not work on virtual devices
     final isPhysicalDevice = await deviceInforService.checkDeviceType();
+    final host = isPhysicalDevice ? '8.8.8.8' : '127.0.0.1';
 
-    pingService.startPing(host: isPhysicalDevice ? '8.8.8.8' : '127.0.0.1');
+    pingService.startPing(host: host);
     pingService.addConnectionStatusListener(
       (isConnected) => onHasInternet(isConnected),
     );
+
+    _watchdogTimer?.cancel();
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      // Manually check the true connection status
+      bool actuallyConnected = await pingService.isConnected;
+
+      // If the true connection is different from our UI state, the stream died!
+      if (actuallyConnected != isHasInternet) {
+        onHasInternet(actuallyConnected);
+
+        // If internet came back, forcefully restart the dead ping stream
+        if (actuallyConnected) {
+          pingService.startPing(host: host);
+        }
+      }
+    });
   }
 
   Future<void> checkAndSyncAllData() async {
@@ -72,15 +91,9 @@ class MainProvider extends ChangeNotifier {
       isSyncronizing = true;
       notifyListeners();
 
-      // Execute all queued actions
-      int queueExecutedCount = await executeAllQueuedActions();
-
       // Sync all data
+      await executeAllQueuedActions();
       await getAndSyncAllUserData();
-
-      if (queueExecutedCount > 0) {
-        AppSnackBar.show("$queueExecutedCount queues executed");
-      }
 
       // Re-check queued actions
       checkIsHasQueuedActions();
@@ -122,6 +135,9 @@ class MainProvider extends ChangeNotifier {
     // Refresh products list
     productsProvider.getAllProducts();
 
+    // Start downloading images in the background
+    _precacheMenuImages();
+
     // Check queued actions
     checkIsHasQueuedActions();
 
@@ -158,5 +174,23 @@ class MainProvider extends ChangeNotifier {
   Future<void> checkIsHasQueuedActions() async {
     isHasQueuedActions = (await getQueuedActions()).isEmpty;
     notifyListeners();
+  }
+
+  Future<void> _precacheMenuImages() async {
+    // Get the latest products we just synced
+    final products = productsProvider.allProducts ?? productsProvider.categories.expand((c) => []).toList(); 
+    final allProductsRes = await productRepository.getProducts();
+    
+    if (allProductsRes.isNotEmpty) {
+      for (var product in allProductsRes) {
+        if (product.imageUrl.isNotEmpty) {
+          try {
+            await DefaultCacheManager().downloadFile(product.imageUrl);
+          } catch (e) {
+            debugPrint('Gagal download gambar: ${product.imageUrl}');
+          }
+        }
+      }
+    }
   }
 }

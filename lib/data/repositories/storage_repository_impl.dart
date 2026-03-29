@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
 import '../../../../core/common/result.dart';
 import '../../core/services/connectivity/ping_service.dart';
 import '../../domain/repositories/storage_repository.dart';
@@ -16,7 +20,22 @@ class StorageRepositoryImpl implements StorageRepository {
   Future<Result<String>> uploadUserPhoto(String imgPath) async {
     try {
       if (!await pingService.isConnected) {
-        return Result.failure(error: 'Please check your internet connection and try again');
+        final File tempFile = File(imgPath);
+        
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        final String offlineDirPath = p.join(appDocDir.path, 'offline_images');
+        final Directory offlineDir = Directory(offlineDirPath);
+
+        if (!await offlineDir.exists()) {
+          await offlineDir.create(recursive: true);
+        }
+
+        final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(imgPath)}';
+        final String newLocalPath = p.join(offlineDirPath, fileName);
+
+        final File permanentFile = await tempFile.copy(newLocalPath);
+
+        return Result.success(data: permanentFile.path);
       }
 
       final res = await storageRemoteDataSource.uploadUserPhoto(imgPath);
@@ -32,7 +51,22 @@ class StorageRepositoryImpl implements StorageRepository {
   Future<Result<String>> uploadProductImage(String imgPath) async {
     try {
       if (!await pingService.isConnected) {
-        return Result.failure(error: 'Please check your internet connection and try again');
+        final File tempFile = File(imgPath);
+        
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        final String offlineDirPath = p.join(appDocDir.path, 'offline_images');
+        final Directory offlineDir = Directory(offlineDirPath);
+
+        if (!await offlineDir.exists()) {
+          await offlineDir.create(recursive: true);
+        }
+
+        final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(imgPath)}';
+        final String newLocalPath = p.join(offlineDirPath, fileName);
+
+        final File permanentFile = await tempFile.copy(newLocalPath);
+
+        return Result.success(data: permanentFile.path);
       }
 
       final res = await storageRemoteDataSource.uploadProductImage(imgPath);

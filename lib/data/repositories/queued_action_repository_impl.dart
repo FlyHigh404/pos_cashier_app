@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import '../../core/common/result.dart';
 import '../../core/services/connectivity/ping_service.dart';
 import '../../core/utilities/console_logger.dart';
 import '../../domain/entities/queued_action_entity.dart';
 import '../../domain/repositories/queued_action_repository.dart';
+import '../../domain/repositories/storage_repository.dart';
+import '../datasources/local/product_local_datasource_impl.dart';
 import '../datasources/local/queued_action_local_datasource_impl.dart';
 import '../datasources/remote/product_remote_datasource_impl.dart';
 import '../datasources/remote/transaction_remote_datasource_impl.dart';
@@ -23,6 +26,8 @@ class QueuedActionRepositoryImpl extends QueuedActionRepository {
   final TransactionRemoteDatasourceImpl transactionRemoteDatasource;
   final ProductRemoteDatasourceImpl productRemoteDatasource;
   final CashierRemoteDatasourceImpl cashierRemoteDatasource;
+  final StorageRepository storageRepository;
+  final ProductLocalDatasourceImpl productLocalDatasource;
 
   QueuedActionRepositoryImpl({
     required this.pingService,
@@ -31,6 +36,8 @@ class QueuedActionRepositoryImpl extends QueuedActionRepository {
     required this.transactionRemoteDatasource,
     required this.productRemoteDatasource,
     required this.cashierRemoteDatasource,
+    required this.storageRepository,
+    required this.productLocalDatasource,
   });
 
   @override
@@ -67,6 +74,30 @@ class QueuedActionRepositoryImpl extends QueuedActionRepository {
     } catch (e) {
       return Result.failure(error: e);
     }
+  }
+
+  Future<Result<ProductModel>> _processQueuedImage(ProductModel param) async {
+    if (param.imageUrl.isNotEmpty && !param.imageUrl.startsWith('http')) {
+      final file = File(param.imageUrl);
+      if (file.existsSync()) {
+        final uploadRes = await storageRepository
+            .uploadProductImage(param.imageUrl)
+            .timeout(const Duration(seconds: 15));
+            
+        if (uploadRes.isSuccess) {
+          param.imageUrl = uploadRes.data!;
+          // Update local DB so it matches the cloud url
+          await productLocalDatasource.updateProduct(param);
+        } else {
+          // Return failure so the queue aborts and retries later!
+          return Result.failure(error: 'Upload failed or timed out');
+        }
+      } else {
+        param.imageUrl = ''; // File was deleted from phone, clear the URL to prevent crash
+        await productLocalDatasource.updateProduct(param);
+      }
+    }
+    return Result.success(data: param);
   }
 
   @override
@@ -148,6 +179,17 @@ class QueuedActionRepositoryImpl extends QueuedActionRepository {
           return Result.success(data: null);
         }
 
+        if (queue.method == 'softDeleteTransaction') {
+          final param = int.parse(queue.param);
+
+          final res = await transactionRemoteDatasource.softDeleteTransaction(
+            param,
+          );
+          if (res.isFailure) return Result.failure(error: res.error!);
+
+          return Result.success(data: null);
+        }
+
         if (queue.method == 'updateTransaction') {
           TransactionModel param = TransactionModel.fromJson(
             jsonDecode(queue.param),
@@ -165,6 +207,10 @@ class QueuedActionRepositoryImpl extends QueuedActionRepository {
       if (queue.repository == 'ProductRepositoryImpl') {
         if (queue.method == 'createProduct') {
           ProductModel param = ProductModel.fromJson(jsonDecode(queue.param));
+
+          final imageRes = await _processQueuedImage(param);
+          if (imageRes.isFailure) return Result.failure(error: imageRes.error!);
+          param = imageRes.data!;
 
           final res = await productRemoteDatasource.createProduct(param);
           if (res.isFailure) return Result.failure(error: res.error!);
@@ -184,6 +230,10 @@ class QueuedActionRepositoryImpl extends QueuedActionRepository {
         if (queue.method == 'updateProduct') {
           ProductModel param = ProductModel.fromJson(jsonDecode(queue.param));
 
+          final imageRes = await _processQueuedImage(param);
+          if (imageRes.isFailure) return Result.failure(error: imageRes.error!);
+          param = imageRes.data!;
+          
           final res = await productRemoteDatasource.updateProduct(param);
           if (res.isFailure) return Result.failure(error: res.error!);
 

@@ -14,6 +14,21 @@ class TransactionLocalDatasourceImpl extends TransactionDatasource {
 
   TransactionLocalDatasourceImpl(this._appDatabase);
 
+  Future<int> getTodayTransactionCount() async {
+    try {
+      final today = DateTime.now().toIso8601String().split('T')[0]; 
+      
+      final result = await _appDatabase.database.rawQuery(
+        "SELECT COUNT(*) as count FROM ${DatabaseConfig.transactionTableName} WHERE createdAt LIKE ?",
+        ['$today%']
+      );
+      
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   @override
   Future<Result<int>> createTransaction(TransactionModel transaction) async {
     try {
@@ -93,8 +108,30 @@ class TransactionLocalDatasourceImpl extends TransactionDatasource {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
 
-        if (transaction.orderedProducts?.isNotEmpty ?? false) {
-          // Use batch for better performance
+        if (transaction.status == 'deleted') {
+          for (var orderedProduct in transaction.orderedProducts ?? []) {
+            var rawProduct = await trx.query(
+              DatabaseConfig.productTableName,
+              where: 'id = ?',
+              whereArgs: [orderedProduct.productId],
+            );
+
+            if (rawProduct.isEmpty) continue;
+
+            var product = ProductModel.fromJson(rawProduct.first);
+            int newSold = product.sold - int.parse(orderedProduct.quantity);
+            
+            await trx.update(
+              DatabaseConfig.productTableName,
+              {'sold': newSold},
+              where: 'id = ?',
+              whereArgs: [product.id],
+            );
+            
+          }
+        }
+
+        else if (transaction.orderedProducts?.isNotEmpty ?? false) {
           var batch = trx.batch();
 
           for (var orderedProduct in transaction.orderedProducts!) {
@@ -132,6 +169,49 @@ class TransactionLocalDatasourceImpl extends TransactionDatasource {
           // Commit batch operations
           await batch.commit(noResult: true);
         }
+      });
+
+      return Result.success(data: null);
+    } catch (e) {
+      return Result.failure(error: e);
+    }
+  }
+  @override
+  Future<Result<void>> softDeleteTransaction(int id) async {
+    try {
+      await _appDatabase.database.transaction((trx) async {
+        var orderedProducts = await trx.query(
+          DatabaseConfig.orderedProductTableName,
+          where: 'transactionId = ?',
+          whereArgs: [id],
+        );
+
+        for (var orderedProductMap in orderedProducts) {
+          var orderedProduct = OrderedProductModel.fromJson(orderedProductMap);
+          var productResults = await trx.query(
+            DatabaseConfig.productTableName,
+            where: 'id = ?',
+            whereArgs: [orderedProduct.productId],
+          );
+
+          if (productResults.isNotEmpty) {
+            var product = ProductModel.fromJson(productResults.first);
+            int revertedSold = product.sold - orderedProduct.quantity;
+            await trx.update(
+              DatabaseConfig.productTableName,
+              {'sold': revertedSold},
+              where: 'id = ?',
+              whereArgs: [orderedProduct.productId],
+            );
+          }
+        }
+
+        await trx.update(
+          DatabaseConfig.transactionTableName,
+          {'status': 'deleted', 'updatedAt': DateTime.now().toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
       });
 
       return Result.success(data: null);

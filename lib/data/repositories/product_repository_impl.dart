@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import '../../core/utilities/console_logger.dart';
 
 import '../../core/common/result.dart';
 import '../../core/constants/constants.dart';
@@ -6,6 +8,7 @@ import '../../core/services/connectivity/ping_service.dart';
 import '../../domain/entities/product_entity.dart';
 import '../../domain/entities/category_entity.dart';
 import '../../domain/repositories/product_repository.dart';
+import '../../domain/repositories/storage_repository.dart';
 import '../datasources/local/product_local_datasource_impl.dart';
 import '../datasources/local/queued_action_local_datasource_impl.dart';
 import '../datasources/remote/product_remote_datasource_impl.dart';
@@ -18,12 +21,14 @@ class ProductRepositoryImpl extends ProductRepository {
   final ProductLocalDatasourceImpl productLocalDatasource;
   final ProductRemoteDatasourceImpl productRemoteDatasource;
   final QueuedActionLocalDatasourceImpl queuedActionLocalDatasource;
+  final StorageRepository storageRepository;
 
   ProductRepositoryImpl({
     required this.pingService,
     required this.productLocalDatasource,
     required this.productRemoteDatasource,
     required this.queuedActionLocalDatasource,
+    required this.storageRepository,
   });
 
   @override
@@ -141,27 +146,31 @@ class ProductRepositoryImpl extends ProductRepository {
       final local = await productLocalDatasource.createProduct(data);
       if (local.isFailure) return Result.failure(error: local.error!);
 
-      if (await pingService.isConnected) {
-        final remote = await productRemoteDatasource.createProduct(data);
-        if (remote.isFailure) return Result.failure(error: remote.error!);
-      } else {
-        final res = await queuedActionLocalDatasource.createQueuedAction(
-          QueuedActionModel(
-            id: DateTime.now().millisecond,
-            repository: 'ProductRepositoryImpl',
-            method: 'createProduct',
-            param: jsonEncode((data).toJson()),
-            isCritical: true,
-            createdAt: DateTime.now().toIso8601String(),
-          ),
-        );
+      final localProductId = local.data!;
+      
+      final jsonString = jsonEncode(data.toJson());
+      final jsonMap = jsonDecode(jsonString) as Map<String, dynamic>;
+      jsonMap['id'] = localProductId;
 
-        if (res.isFailure) return Result.failure(error: res.error!);
+      var safeDataWithId = ProductModel.fromJson(jsonMap);
+      safeDataWithId = await _ensureRemoteImage(safeDataWithId);
+
+      if (await pingService.isConnected) {
+        final remote = await productRemoteDatasource.createProduct(safeDataWithId);
+        if (remote.isFailure) {
+          await _queueProductAction('createProduct', jsonEncode(safeDataWithId.toJson()));
+        }
+      } else {
+        await _queueProductAction('createProduct', jsonEncode(safeDataWithId.toJson()));
       }
 
-      return Result.success(data: local.data!);
+      if (safeDataWithId.imageUrl.startsWith('http')) {
+        await productLocalDatasource.updateProduct(safeDataWithId);
+      }
+
+      return Result.success(data: localProductId);
     } catch (e) {
-      return Result.failure(error: e);
+      return Result.failure(error: e.toString());
     }
   }
 
@@ -173,55 +182,47 @@ class ProductRepositoryImpl extends ProductRepository {
 
       if (await pingService.isConnected) {
         final remote = await productRemoteDatasource.deleteProduct(productId);
-        if (remote.isFailure) return Result.failure(error: remote.error!);
+        if (remote.isFailure) {
+          await _queueProductAction('deleteProduct', productId.toString());
+        }
       } else {
-        final res = await queuedActionLocalDatasource.createQueuedAction(
-          QueuedActionModel(
-            id: DateTime.now().millisecond,
-            repository: 'ProductRepositoryImpl',
-            method: 'deleteProduct',
-            param: productId.toString(),
-            isCritical: true,
-            createdAt: DateTime.now().toIso8601String(),
-          ),
-        );
-
-        if (res.isFailure) return Result.failure(error: res.error!);
+        await _queueProductAction('deleteProduct', productId.toString());
       }
 
       return Result.success(data: null);
     } catch (e) {
-      return Result.failure(error: e);
+      return Result.failure(error: e.toString()); // 🚀 FIXED: Always return a string!
     }
   }
 
   @override
   Future<Result<void>> updateProduct(ProductEntity product) async {
     try {
-      final local = await productLocalDatasource.updateProduct(ProductModel.fromEntity(product));
+      final data = ProductModel.fromEntity(product);
+
+      final local = await productLocalDatasource.updateProduct(data);
       if (local.isFailure) return Result.failure(error: local.error!);
 
-      if (await pingService.isConnected) {
-        final remote = await productRemoteDatasource.updateProduct(ProductModel.fromEntity(product));
-        if (remote.isFailure) return Result.failure(error: remote.error!);
-      } else {
-        final res = await queuedActionLocalDatasource.createQueuedAction(
-          QueuedActionModel(
-            id: DateTime.now().millisecond,
-            repository: 'ProductRepositoryImpl',
-            method: 'updateProduct',
-            param: jsonEncode(ProductModel.fromEntity(product).toJson()),
-            isCritical: true,
-            createdAt: DateTime.now().toIso8601String(),
-          ),
-        );
+      final jsonString = jsonEncode(data.toJson());
+      final jsonMap = jsonDecode(jsonString) as Map<String, dynamic>;
+      var safeData = ProductModel.fromJson(jsonMap);
+      safeData = await _ensureRemoteImage(safeData);
 
-        if (res.isFailure) return Result.failure(error: res.error!);
+      if (await pingService.isConnected) {
+        final remote = await productRemoteDatasource.updateProduct(safeData);
+        if (remote.isFailure) {
+          await _queueProductAction('updateProduct', jsonEncode(safeData.toJson()));
+        }
+      } else {
+        await _queueProductAction('updateProduct', jsonEncode(safeData.toJson()));
+      }
+      if (safeData.imageUrl.startsWith('http')) {
+        await productLocalDatasource.updateProduct(safeData);
       }
 
       return Result.success(data: null);
     } catch (e) {
-      return Result.failure(error: e);
+      return Result.failure(error: e.toString());
     }
   }
 
@@ -230,7 +231,6 @@ class ProductRepositoryImpl extends ProductRepository {
     int syncedToLocalCount = 0;
     int syncedToRemoteCount = 0;
 
-    // Track processed IDs to avoid duplicate syncing
     final processedIds = <int>{};
 
     // Process local products first
@@ -238,7 +238,6 @@ class ProductRepositoryImpl extends ProductRepository {
       final matchRemoteData = remote.where((remoteData) => remoteData.id == localData.id).firstOrNull;
 
       if (matchRemoteData != null) {
-        // Mark as processed
         processedIds.add(localData.id);
 
         final updatedAtLocal = DateTime.tryParse(localData.updatedAt ?? '');
@@ -259,20 +258,35 @@ class ProductRepositoryImpl extends ProductRepository {
           final res = await productLocalDatasource.updateProduct(matchRemoteData);
           if (res.isSuccess) syncedToLocalCount += 1;
         } else if (isLocalNewer) {
+          
+          var safeLocalData = await _ensureRemoteImage(localData);
+          
           // Update remote with local data
-          final res = await productRemoteDatasource.updateProduct(localData);
-          if (res.isSuccess) syncedToRemoteCount += 1;
+          final res = await productRemoteDatasource.updateProduct(safeLocalData);
+          if (res.isSuccess) {
+            syncedToRemoteCount += 1;
+            if (safeLocalData.imageUrl.startsWith('http')) {
+              await productLocalDatasource.updateProduct(safeLocalData);
+            }
+          }
         }
         // If not significant difference, do nothing (already in sync)
       } else {
         // No matching remote product, create it
         processedIds.add(localData.id);
-        final res = await productRemoteDatasource.createProduct(localData);
-        if (res.isSuccess) syncedToRemoteCount += 1;
+
+        var safeLocalData = await _ensureRemoteImage(localData);
+
+        final res = await productRemoteDatasource.createProduct(safeLocalData);
+        if (res.isSuccess) {
+          syncedToRemoteCount += 1;
+          if (safeLocalData.imageUrl.startsWith('http')) {
+            await productLocalDatasource.updateProduct(safeLocalData);
+          }
+        }
       }
     }
 
-    // Process remaining remote products that weren't in local
     for (final remoteData in remote) {
       // Skip if already processed in the first loop
       if (processedIds.contains(remoteData.id)) continue;
@@ -283,6 +297,54 @@ class ProductRepositoryImpl extends ProductRepository {
     }
 
     return (syncedToLocalCount, syncedToRemoteCount);
+  }
+
+  Future<void> _queueProductAction(String method, String param) async {
+    await queuedActionLocalDatasource.createQueuedAction(
+      QueuedActionModel(
+        id: DateTime.now().millisecondsSinceEpoch,
+        repository: 'ProductRepositoryImpl',
+        method: method,
+        param: param,
+        isCritical: true,
+        createdAt: DateTime.now().toIso8601String(),
+      ),
+    );
+  }
+
+  Future<ProductModel> _ensureRemoteImage(ProductModel model) async {
+    if (model.imageUrl.isEmpty || model.imageUrl.startsWith('http')) {
+      return model;
+    }
+
+    // upload
+    if (await pingService.isConnected) {
+      try {
+        final file = File(model.imageUrl);
+        if (!file.existsSync()) {
+          cl('⚠️ Offline image lost: ${model.imageUrl}');
+          model.imageUrl = '';
+          return model;
+        }
+
+        final uploadResult = await storageRepository
+            .uploadProductImage(model.imageUrl)
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => Result.failure(error: 'Upload timed out'),
+            );
+        
+        if (uploadResult.isSuccess) {
+          model.imageUrl = uploadResult.data!; 
+        } else {
+          cl('⚠️ Upload Failed/Timed Out: ${uploadResult.error}');
+        }
+      } catch (e) {
+        cl('⚠️ Upload Crashed: $e');
+      }
+    }
+    
+    return model; // If offline or upload fails, keep the local path
   }
 
 

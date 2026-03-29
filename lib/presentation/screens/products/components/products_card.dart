@@ -1,5 +1,6 @@
-import 'package:app_image/app_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 import '../../../../core/themes/app_sizes.dart';
 import '../../../../core/utilities/currency_formatter.dart';
@@ -62,24 +63,39 @@ class ProductsCard extends StatelessWidget {
                               color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             ),
                           ),
-                          child: product.imageUrl == null || product.imageUrl!.isEmpty
+                          child: (product.imageUrl == null || product.imageUrl!.isEmpty)
                               ? Icon(
                                   Icons.image,
                                   color: Theme.of(context).colorScheme.surfaceDim,
                                   size: 32,
                                 )
-                              : Image.network(
-                                  product.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
+                              : product.imageUrl!.startsWith('http')
+                                ? CachedNetworkImage(
+                                    imageUrl: product.imageUrl!,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => const Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) => Icon(
                                       Icons.image_not_supported,
                                       color: Theme.of(context).colorScheme.surfaceDim,
                                       size: 32,
-                                    );
-                                  },
+                                    ),
+                                  )
+                                : Image.file(
+                                  File(product.imageUrl!), // Loads the local offline image perfectly!
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Icon(
+                                    Icons.broken_image,
+                                    color: Theme.of(context).colorScheme.surfaceDim,
+                                    size: 32,
+                                  ),
                                 ),
-                        ),
+                          ),
                       ),
                     ),
                     if (!product.isAvailable) const _OutOfStock(),

@@ -31,7 +31,7 @@ class CashierRepositoryImpl extends CashierRepository {
       final local = await cashierLocalDatasource.getAllCashiers(userId);
       if (local.isFailure) return Result.failure(error: local.error!);
 
-      if (await await pingService.isConnected) {
+      if (await pingService.isConnected) {
         final remote = await cashierRemoteDatasource.getAllCashiers(userId);
         if (remote.isFailure) return Result.failure(error: remote.error!);
 
