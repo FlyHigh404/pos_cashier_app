@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS '$transactionTableName' (
     'cashierName' TEXT,
     'createdAt' DATETIME DEFAULT CURRENT_TIMESTAMP,
     'updatedAt' DATETIME DEFAULT CURRENT_TIMESTAMP,
+    'status' TEXT DEFAULT 'processing',
     PRIMARY KEY ('id'),
     FOREIGN KEY ('createdById') REFERENCES 'User' ('id')
 );
