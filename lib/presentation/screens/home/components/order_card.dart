@@ -1,6 +1,7 @@
-import 'package:app_image/app_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:io';
 
 import '../../../../core/themes/app_sizes.dart';
 import '../../../../core/utilities/currency_formatter.dart';
@@ -168,17 +169,48 @@ class _OrderCardState extends State<OrderCard> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  AppImage(
+                  Container(
                     width: 70,
                     height: 70,
-                    image: widget.imageUrl,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(width: 0.5, color: Theme.of(context).colorScheme.surfaceContainerHighest),
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-                    errorWidget: Icon(
-                      Icons.image,
-                      color: Theme.of(context).colorScheme.surfaceDim,
-                      size: 32,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(width: 0.5, color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3.5),
+                      child: widget.imageUrl.isEmpty
+                          ? Icon(
+                              Icons.image,
+                              color: Theme.of(context).colorScheme.surfaceDim,
+                              size: 32,
+                            )
+                          : widget.imageUrl!.startsWith('http')
+                            ? CachedNetworkImage(
+                              imageUrl: widget.imageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Icon(
+                                Icons.image_not_supported,
+                                color: Theme.of(context).colorScheme.surfaceDim,
+                                size: 32,
+                              ),
+                            )
+                            : Image.file(
+                              File(widget.imageUrl!), // Loads the local offline image perfectly!
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Icon(
+                                Icons.broken_image,
+                                color: Theme.of(context).colorScheme.surfaceDim,
+                                size: 32,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),

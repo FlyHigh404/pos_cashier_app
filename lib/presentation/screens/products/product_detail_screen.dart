@@ -1,5 +1,6 @@
-import 'package:app_image/app_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pos_cashier_app/domain/entities/product_entity.dart';
@@ -131,20 +132,38 @@ class _ProductImage extends StatelessWidget {
         minHeight: AppSizes.screenHeight(context) / 3,
         maxHeight: AppSizes.screenHeight(context) / 3,
       ),
-      child: AppImage(
-        image: imageUrl ?? '',
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        border: Border.all(
-          width: 0.5,
-          color: Theme.of(context).colorScheme.primaryContainer,
-        ),
-        enableFullScreenView: true,
-        errorWidget: Icon(
-          Icons.image,
-          color: Theme.of(context).colorScheme.surfaceDim,
-          size: 32,
-        ),
-      ),
+      child: (imageUrl == null || imageUrl!.isEmpty)
+            ? Icon(
+                Icons.image,
+                color: Theme.of(context).colorScheme.surfaceDim,
+                size: 32,
+              )
+            : imageUrl!.startsWith('http')
+                ? CachedNetworkImage(
+                  imageUrl: imageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => const Center(
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Icon(
+                    Icons.image_not_supported,
+                    color: Theme.of(context).colorScheme.surfaceDim,
+                    size: 32,
+                  ),
+                )
+                : Image.file(
+                  File(imageUrl!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.broken_image,
+                    color: Theme.of(context).colorScheme.surfaceDim,
+                    size: 32,
+                  ),
+                ),
     );
   }
 }

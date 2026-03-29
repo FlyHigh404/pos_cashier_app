@@ -114,6 +114,9 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
   final _descriptionController = TextEditingController();
   bool _isQrisConfirmed = false;
 
+  // track cash shortcuts tabs
+  final Map<int, int> _shortcutCounts = {};
+
   @override
   void initState() {
     super.initState();
@@ -152,30 +155,77 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
     }
   }
 
-  Widget _buildShortcutButton(String label, int amount, HomeProvider provider) {
+  Widget _buildShortcutButton(String label, int amount, HomeProvider provider, {bool isUangPas = false}) {
+    final count = _shortcutCounts[amount] ?? 0;
+
     return Expanded(
       child: InkWell(
         onTap: () {
-          _amountController.text = amount.toString();
-          provider.onChangedReceivedAmount(amount);
-          setState(() {}); // Updates the UI instantly
+          int newAmount;
+
+          if (isUangPas) {
+            newAmount = amount;
+            _shortcutCounts.clear(); // Reset all counters if Uang Pas is tapped
+          } else {
+            final currentAmount = int.tryParse(_amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+            newAmount = currentAmount + amount;
+            _shortcutCounts[amount] = count + 1; // Increment the specific button counter
+          }
+
+          _amountController.text = newAmount.toString();
+          provider.onChangedReceivedAmount(newAmount);
+          setState(() {}); 
         },
         borderRadius: BorderRadius.circular(4),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 0.5),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
+        child: Stack(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                // Change color slightly if it has been tapped!
+                color: count > 0 
+                    ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5)
+                    : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                border: Border.all(
+                    color: count > 0 
+                        ? Theme.of(context).colorScheme.primary 
+                        : Theme.of(context).colorScheme.outlineVariant, 
+                    width: count > 0 ? 1 : 0.5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
             ),
-          ),
+            
+            // Show counter
+            if (count > 0 && !isUangPas)
+              Positioned(
+                top: 2,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'x$count',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -187,7 +237,7 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
     final provider = ref.watch(homeControllerProvider);
     
     // Auto-calculate the change (kembalian)
-    final int receivedAmount = int.tryParse(_amountController.text) ?? 0;
+    final int receivedAmount = int.tryParse(_amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
     final int totalAmount = provider.getTotalAmount();
     final int kembalian = (receivedAmount - totalAmount) > 0 ? (receivedAmount - totalAmount) : 0;
     
@@ -272,10 +322,9 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
               labelText: 'Jumlah Terima',
               hintText: 'Jumlah uang tunai yang diterima...',
               onChanged: (val) {
-                // Safely removes dots, commas, spaces, or letters (like "Rp") 
                 final cleanVal = val.replaceAll(RegExp(r'[^0-9]'), '');
                 provider.onChangedReceivedAmount(int.tryParse(cleanVal) ?? 0);
-                setState(() {}); // Updates the Kembalian text dynamically
+                setState(() {});
               },
               ),
           ),
@@ -285,15 +334,65 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
         if (!isQris)
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
-            child: Row(
+            child: Column(
               children: [
-                _buildShortcutButton('Uang Pas', totalAmount, provider),
-                const SizedBox(width: 6),
-                _buildShortcutButton('20k', 20000, provider),
-                const SizedBox(width: 6),
-                _buildShortcutButton('50k', 50000, provider),
-                const SizedBox(width: 6),
-                _buildShortcutButton('100k', 100000, provider),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Pintasan Tunai',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          _amountController.clear();
+                          provider.onChangedReceivedAmount(0);
+                          _shortcutCounts.clear();
+                          setState(() {}); 
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                          child: Text(
+                            'Kosongkan',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.outlineVariant,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    _buildShortcutButton('Uang Pas', totalAmount, provider, isUangPas: true),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('1k', 1000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('2k', 2000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('5k', 5000, provider),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _buildShortcutButton('10k', 10000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('20k', 20000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('50k', 50000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('100k', 100000, provider),
+                  ],
+                ),
               ],
             ),
           ),

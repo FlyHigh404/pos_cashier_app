@@ -1,5 +1,6 @@
-import 'package:app_image/app_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 import '../../../../core/themes/app_sizes.dart';
 import '../../../../core/utilities/currency_formatter.dart';
@@ -10,9 +11,9 @@ class MenuCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool enabled;
   final bool showCartIcon;
-  final int quantity; // NEW: Tracks how many are in the cart
-  final VoidCallback? onIncrement; // NEW: Triggers when + is tapped
-  final VoidCallback? onDecrement; // NEW: Triggers when - is tapped
+  final int quantity;
+  final VoidCallback? onIncrement;
+  final VoidCallback? onDecrement;
 
   const MenuCard({
     super.key,
@@ -61,39 +62,43 @@ class MenuCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerLowest,
+                            color: Theme.of(context).colorScheme.surfaceContainerLowest,
                             border: Border.all(
                               width: 0.5,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             ),
                           ),
-                          child:
-                              product.imageUrl == null ||
-                                  product.imageUrl!.isEmpty
+                          child: (product.imageUrl == null || product.imageUrl!.isEmpty)
                               ? Icon(
-                                  Icons.image,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceDim,
+                                  Icons.image_not_supported,
+                                  color: Theme.of(context).colorScheme.surfaceDim,
                                   size: 32,
                                 )
-                              : Image.network(
-                                  product.imageUrl!,
+                              : product.imageUrl!.startsWith('http')
+                                ? CachedNetworkImage(
+                                  imageUrl: product.imageUrl!,
                                   fit: BoxFit.cover,
-                                  // 🚀 THE FIX: This stops the offline crash!
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      Icons.image_not_supported,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.surfaceDim,
-                                      size: 32,
-                                    );
-                                  },
+                                  placeholder: (context, url) => const Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => Icon(
+                                    Icons.image_not_supported,
+                                    color: Theme.of(context).colorScheme.surfaceDim,
+                                    size: 32,
+                                  ),
+                                )
+                                : Image.file(
+                                  File(product.imageUrl!),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Icon(
+                                    Icons.broken_image,
+                                    color: Theme.of(context).colorScheme.surfaceDim,
+                                    size: 32,
+                                  ),
                                 ),
                         ),
                       ),
@@ -139,30 +144,23 @@ class MenuCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       quantity == 0
                           ? GestureDetector(
-                              onTap:
-                                  onIncrement, // If 0, tapping the cart acts like "+"
+                              onTap: onIncrement, 
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primaryContainer,
+                                  color: Theme.of(context).colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Icon(
                                   Icons.add_shopping_cart_rounded,
                                   size: 16,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimaryContainer,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
                                 ),
                               ),
                             )
                           : Container(
                               decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
+                                color: Theme.of(context).colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
@@ -181,22 +179,15 @@ class MenuCard extends StatelessWidget {
                                       child: Icon(
                                         Icons.remove,
                                         size: 14,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                   ),
                                   Text(
                                     '$quantity',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelMedium
-                                        ?.copyWith(
+                                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                           fontWeight: FontWeight.bold,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onPrimaryContainer,
+                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                                         ),
                                   ),
                                   InkWell(
@@ -212,9 +203,7 @@ class MenuCard extends StatelessWidget {
                                       child: Icon(
                                         Icons.add,
                                         size: 14,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                   ),
