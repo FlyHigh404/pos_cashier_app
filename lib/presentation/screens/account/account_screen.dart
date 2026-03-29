@@ -38,6 +38,22 @@ class AccountScreen extends StatelessWidget {
             const Divider(),
             const SizedBox(height: AppSizes.padding),
 
+            Text(
+              'STATUS CLOUD & SINKRONISASI',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 8),
+
+            _SettingsListTile(
+              icon: Icons.cloud_sync_rounded,
+              title: 'Cadangkan Data',
+              onTap: () => context.push('/account/sync-data'),
+            ),
+            
+            const SizedBox(height: AppSizes.padding * 2),
             
             Text(
               'PENGATURAN APLIKASI',

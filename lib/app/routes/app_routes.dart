@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pos_cashier_app/presentation/screens/account/sync_data_screen.dart';
 
 import '../../presentation/providers/auth/auth_provider.dart';
 import '../../presentation/providers/session/session_provider.dart';
@@ -185,6 +186,7 @@ class AppRoutes {
         );
       },
       routes: [
+        _syncData(),
         _profileEdit(),
         _about(),
         _printerSettings(),
@@ -249,6 +251,15 @@ class AppRoutes {
     );
   }
 
+  GoRoute _syncData() {
+    return GoRoute(
+      path: 'sync-data',
+      builder: (context, state) {
+        return const SyncDataScreen();
+      },
+    );
+  }
+  
   GoRoute _profileEdit() {
     return GoRoute(
       path: 'profile',

@@ -147,6 +147,7 @@ final productRepositoryProvider = Provider<ProductRepository>(
     productLocalDatasource: ref.watch(productLocalDatasourceProvider),
     productRemoteDatasource: ref.watch(productRemoteDatasourceProvider),
     queuedActionLocalDatasource: ref.watch(queuedActionLocalDatasourceProvider),
+    storageRepository: ref.watch(storageRepositoryProvider),
   ),
 );
 final transactionRepositoryProvider = Provider<TransactionRepository>(
@@ -173,6 +174,8 @@ final queuedActionRepositoryProvider = Provider<QueuedActionRepository>(
     transactionRemoteDatasource: ref.watch(transactionRemoteDatasourceProvider),
     productRemoteDatasource: ref.watch(productRemoteDatasourceProvider),
     cashierRemoteDatasource: ref.watch(cashierRemoteDatasourceProvider),
+    storageRepository: ref.watch(storageRepositoryProvider),
+    productLocalDatasource: ref.watch(productLocalDatasourceProvider),
   ),
 );
 final cashierRepositoryProvider = Provider<CashierRepository>(
