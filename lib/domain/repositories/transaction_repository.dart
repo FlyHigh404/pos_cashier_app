@@ -12,6 +12,8 @@ abstract class TransactionRepository {
 
   Future<Result<void>> deleteTransaction(int transactionId);
 
+  Future<Result<void>> softDeleteTransaction(int transactionId);
+
   Future<Result<List<TransactionEntity>>> getUserTransactions(
     String userId, {
     String orderBy,

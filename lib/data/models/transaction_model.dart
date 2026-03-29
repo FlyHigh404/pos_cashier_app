@@ -17,6 +17,7 @@ class TransactionModel {
   String? cashierName;
   String? createdAt;
   String? updatedAt;
+  String? status;
 
   TransactionModel({
     required this.id,
@@ -33,6 +34,7 @@ class TransactionModel {
     this.cashierName,
     this.createdAt,
     this.updatedAt,
+    this.status,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -40,14 +42,18 @@ class TransactionModel {
       id: json['id'],
       paymentMethod: json['paymentMethod'],
       customerName: json['customerName'],
-      description: json['description'],createdById: json['createdById'] ?? json['created_by_id'],
-      createdBy: json['createdBy'] != null 
-          ? UserModel.fromJson(json['createdBy'] as Map<String, dynamic>) 
+      description: json['description'],
+      createdById: json['createdById'] ?? json['created_by_id'],
+      createdBy: json['createdBy'] != null
+          ? UserModel.fromJson(json['createdBy'] as Map<String, dynamic>)
           : null,
       orderedProducts: json['orderedProducts'] != null
           ? (json['orderedProducts'] as List)
-              .map((e) => OrderedProductModel.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map(
+                  (e) =>
+                      OrderedProductModel.fromJson(e as Map<String, dynamic>),
+                )
+                .toList()
           : null,
       receivedAmount: json['receivedAmount'],
       returnAmount: json['returnAmount'],
@@ -56,6 +62,7 @@ class TransactionModel {
       cashierName: json['cashierName'],
       createdAt: json['createdAt'],
       updatedAt: json['updatedAt'],
+      status: json['status'],
     );
   }
 
@@ -75,6 +82,7 @@ class TransactionModel {
       'cashierName': cashierName,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'status': status,
     };
   }
 
@@ -85,8 +93,12 @@ class TransactionModel {
       customerName: entity.customerName,
       description: entity.description,
       createdById: entity.createdById,
-      createdBy: entity.createdBy != null ? UserModel.fromEntity(entity.createdBy!) : null,
-      orderedProducts: entity.orderedProducts?.map((e) => OrderedProductModel.fromEntity(e)).toList(),
+      createdBy: entity.createdBy != null
+          ? UserModel.fromEntity(entity.createdBy!)
+          : null,
+      orderedProducts: entity.orderedProducts
+          ?.map((e) => OrderedProductModel.fromEntity(e))
+          .toList(),
       receivedAmount: entity.receivedAmount,
       returnAmount: entity.returnAmount,
       totalAmount: entity.totalAmount,
@@ -94,6 +106,7 @@ class TransactionModel {
       cashierName: entity.cashierName,
       createdAt: entity.createdAt ?? DateTime.now().toIso8601String(),
       updatedAt: entity.updatedAt ?? DateTime.now().toIso8601String(),
+      status: entity.status,
     );
   }
 
@@ -113,6 +126,7 @@ class TransactionModel {
       cashierName: cashierName,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      status: status,
     );
   }
 }

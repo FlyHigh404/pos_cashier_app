@@ -83,7 +83,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final groupedData = _groupTransactions(allTransactions ?? []);
     final todayKey = DateTime.now().toString().split(' ')[0];
     final todayTransactions = groupedData[todayKey] ?? [];
-    final todayRevenue = todayTransactions.fold(0, (sum, item) => sum + (item.totalAmount));
+    final todayRevenue = todayTransactions
+        .where((t) => t.status != 'deleted')
+        .fold(0, (sum, item) => sum + (item.totalAmount));
+    final todaySuccessOrders = todayTransactions.where((t) => t.status != 'deleted').length;
 
     return Scaffold(
       appBar: AppBar(
@@ -91,7 +94,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         elevation: 0,
         shadowColor: Colors.transparent,
         actions: [
-          // FIXED: Removed 'const' and passed the function as a callback
           _GenerateReportButton(
             onTap: () => _showReportFilterDialog(context),
           ),
@@ -108,7 +110,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               // Summary card
               SliverToBoxAdapter(
                 child: _TodaySummaryCard(
-                  orderCount: todayTransactions.length,
+                  orderCount: todaySuccessOrders,
                   revenue: todayRevenue,
                 ),
               ),
@@ -122,7 +124,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ...groupedData.entries.map((entry) {
                   final date = entry.key;
                   final transactions = entry.value;
-                  final dailyTotal = transactions.fold(0, (sum, item) => sum + (item.totalAmount));
+                  final dailyTotal = transactions
+                      .where((t) => t.status != 'deleted')
+                      .fold(0, (sum, item) => sum + (item.totalAmount));
 
                   return SliverMainAxisGroup(
                     slivers: [
@@ -137,7 +141,41 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: AppSizes.padding),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
-                            (context, index) => TransactionCard(transaction: transactions[index]),
+                            (context, index) {
+                              final transaction = transactions[index];
+                              final isDeleted = transaction.status == 'deleted';
+
+                              return Opacity(
+                                opacity: isDeleted ? 0.35 : 1.0,
+                                child: Stack(
+                                  children: [
+                                    TransactionCard(transaction: transaction),
+                                    
+                                    if (isDeleted)
+                                      Positioned(
+                                        top: 12,
+                                        right: 12,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.error,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            'BATAL',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
                             childCount: transactions.length,
                           ),
                         ),
@@ -334,7 +372,7 @@ class _ReportFilterSheet extends ConsumerWidget {
     final allTransactions = ref.read(transactionsControllerProvider).allTransactions ?? [];
     
     final filteredTransactions = allTransactions.where((t) {
-      if (t.createdAt == null) return false;
+      if (t.createdAt == null || t.status == 'deleted') return false;
       try {
         final tDate = DateTime.parse(t.createdAt!);
         return tDate.isAfter(startDate.subtract(const Duration(seconds: 1))) && 

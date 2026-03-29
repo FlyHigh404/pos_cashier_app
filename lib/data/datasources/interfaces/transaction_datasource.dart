@@ -8,6 +8,8 @@ abstract class TransactionDatasource {
 
   Future<Result<void>> deleteTransaction(int id);
 
+  Future<Result<void>> softDeleteTransaction(int id);
+
   Future<Result<TransactionModel?>> getTransaction(int id);
 
   Future<Result<List<TransactionModel>>> getAllUserTransactions(String userId);

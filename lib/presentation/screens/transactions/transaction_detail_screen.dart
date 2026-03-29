@@ -8,6 +8,7 @@ import '../../../core/utilities/currency_formatter.dart';
 import '../../../core/utilities/date_time_formatter.dart';
 import '../../../domain/entities/ordered_product_entity.dart';
 import '../../../domain/entities/transaction_entity.dart';
+import '../../widgets/app_button.dart';
 import '../../widgets/app_empty_state.dart';
 import '../../widgets/app_progress_indicator.dart';
 
@@ -16,28 +17,78 @@ class TransactionDetailScreen extends ConsumerWidget {
 
   const TransactionDetailScreen({super.key, required this.id});
 
-  void _reprint(BuildContext context, WidgetRef ref) async {
+  void _voidTransaction(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Batalkan Transaksi?'),
+        content: const Text(
+          'Transaksi ini akan dibatalkan dan pembayaran akan dianggap tidak valid. Apakah Anda yakin?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Tidak', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya, Batalkan', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Memproses pembatalan...')),
+    );
+    final controller = ref.read(transactionDetailControllerProvider);
+    final result = await controller.softDeleteTransaction(id);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transaksi berhasil dibatalkan'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // Refresh the screen data to show the new 'deleted' status
+      controller.getTransactionDetail(id); 
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal membatalkan transaksi: ${result.error}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _print(BuildContext context, WidgetRef ref) async {
     final transaction = ref.read(transactionDetailControllerProvider).currentTransaction;
     if (transaction == null) return;
 
     final printerService = ref.read(printerServiceProvider);
 
-    // Bersihkan snackbar lama jika ada
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
-    // 1. Validasi awal
     if (printerService.selectedPrinter == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Printer belum dipilih! Silakan atur di menu Pengaturan.'),
-          backgroundColor: Colors.orange,
+          backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
       return; 
     }
 
-    // 2. Tampilkan status sedang memproses
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Menghubungkan ke printer & mencetak...'),
@@ -45,15 +96,11 @@ class TransactionDetailScreen extends ConsumerWidget {
       ),
     );
 
-    // 3. Eksekusi print
     final result = await printerService.printTransaction(transaction);
 
-    // 4. Cek apakah widget masih terpasang
     if (!context.mounted) return;
 
-    // 5. Eksekusi notifikasi hasil di frame berikutnya agar pasti muncul
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // HAPUS snackbar "Menghubungkan..." secara paksa
       ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
       if (result.isFailure) {
@@ -85,6 +132,7 @@ class TransactionDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTransaction = ref.watch(transactionDetailControllerProvider).currentTransaction;
+    final isDeleted = currentTransaction?.status == 'deleted';
 
     return Scaffold(
       appBar: AppBar(
@@ -99,11 +147,11 @@ class TransactionDetailScreen extends ConsumerWidget {
           }
 
           if (snapshot.hasError) {
-            throw snapshot.error.toString();
+            return Center(child: Text(snapshot.error.toString()));
           }
 
           if (snapshot.data == null) {
-            return const AppEmptyState(title: 'Data Tidak Ditemukan'); // Diubah ke Bahasa Indonesia
+            return const AppEmptyState(title: 'Data Tidak Ditemukan');
           }
 
           final transaction = snapshot.data!;
@@ -112,25 +160,55 @@ class TransactionDetailScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(AppSizes.padding),
             child: Column(
               children: [
-                const _StatusSection(),
+                _StatusSection(status: transaction.status),
                 const SizedBox(height: AppSizes.padding * 2),
+                if (transaction.status == 'deleted')
+                  Container(
+                    margin: const EdgeInsets.only(bottom: AppSizes.padding),
+                    padding: const EdgeInsets.all(12),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Theme.of(context).colorScheme.error),
+                    ),
+                    child: Text(
+                      'TRANSAKSI INI TELAH DIBATALKAN',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error, 
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 _TransactionDetail(transaction: transaction),
                 const SizedBox(height: AppSizes.padding),
                 _PaymentDetail(transaction: transaction),
                 const SizedBox(height: AppSizes.padding),
+                if (transaction.status != 'deleted')
+                  AppButton(
+                    text: 'Batalkan Transaksi',
+                    textColor: Theme.of(context).colorScheme.error,
+                    buttonColor: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
+                    borderColor: Colors.transparent,
+                    onTap: () => _voidTransaction(context, ref),
+                  ),
+                const SizedBox(height: AppSizes.padding * 2),
               ],
             ),
           );
         },
       ),
-      bottomNavigationBar: currentTransaction == null 
+      bottomNavigationBar: currentTransaction == null
           ? null 
-          : _BuildPrintButton(onPressed: () async {
-              final bool? confirm = await _showConfirmDialog(context);
-              if (confirm == true) {
-                _reprint(context, ref);
-              }
-            }),
+          : _BuildPrintButton(
+              onPressed: isDeleted ? null : () async {
+                final bool? confirm = await _showConfirmDialog(context);
+                if (confirm == true) {
+                  _print(context, ref);
+                }
+              },
+            ),
       );
   }
   
@@ -150,7 +228,7 @@ class TransactionDetailScreen extends ConsumerWidget {
 }
 
 class _BuildPrintButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const _BuildPrintButton({required this.onPressed});
 
@@ -167,7 +245,7 @@ class _BuildPrintButton extends StatelessWidget {
             offset: const Offset(0, -5),
           ),
         ],
-      ), // <--- FIXED: This was accidentally `],` in the previous code!
+      ), 
       child: SafeArea(
         child: ElevatedButton.icon(
           onPressed: onPressed,
@@ -183,11 +261,13 @@ class _BuildPrintButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.primary,
             foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            disabledBackgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest, // 🚀 Disabled bg color
+            disabledForegroundColor: Theme.of(context).colorScheme.outline, // 🚀 Disabled text color
             minimumSize: const Size(double.infinity, 60),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSizes.radius),
             ),
-            elevation: 2,
+            elevation: onPressed == null ? 0 : 2, // Remove shadow when disabled
           ),
         ),
       ),
@@ -196,23 +276,29 @@ class _BuildPrintButton extends StatelessWidget {
 }
 
 class _StatusSection extends StatelessWidget {
-  const _StatusSection();
+  final String? status;
+
+  const _StatusSection({required this.status});
 
   @override
   Widget build(BuildContext context) {
+    // 🚀 Change UI based on whether it is deleted or not
+    final isDeleted = status == 'deleted';
+
     return Column(
       children: [
-        const Icon(
-          Icons.check_circle_outline_rounded,
-          color: AppColors.green,
+        Icon(
+          isDeleted ? Icons.cancel_rounded : Icons.check_circle_outline_rounded,
+          color: isDeleted ? Theme.of(context).colorScheme.error : AppColors.green,
           size: 60,
         ),
         const SizedBox(height: AppSizes.padding / 2),
         Text(
-          'Transaksi Berhasil', // Diubah ke Bahasa Indonesia
+          isDeleted ? 'Transaksi Dibatalkan' : 'Transaksi Berhasil',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: isDeleted ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.onSurface,
               ),
         ),
       ],
@@ -240,7 +326,7 @@ class _TransactionDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'ID Transaksi', // Diubah ke Bahasa Indonesia
+                'ID Transaksi',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -258,13 +344,12 @@ class _TransactionDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Metode Pembayaran', // Diubah ke Bahasa Indonesia
+                'Metode Pembayaran',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               Text(
-                // Menambahkan logika: Jika 'cash' tampilkan 'Tunai', jika 'qris' tampilkan 'QRIS'
-                transaction.paymentMethod.toLowerCase() == 'cash' 
-                    ? 'Tunai' 
+                transaction.paymentMethod.toLowerCase() == 'cash'
+                    ? 'Tunai'
                     : transaction.paymentMethod.toUpperCase(),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
@@ -286,7 +371,7 @@ class _TransactionDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Waktu Transaksi', // Diubah ke Bahasa Indonesia
+                'Waktu Transaksi',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               Text(
@@ -300,7 +385,7 @@ class _TransactionDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Nama Pelanggan', // Diubah ke Bahasa Indonesia
+                'Nama Pelanggan',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               Text(
@@ -314,7 +399,7 @@ class _TransactionDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Keterangan', // Diubah ke Bahasa Indonesia
+                'Keterangan',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               Text(
@@ -349,7 +434,7 @@ class _PaymentDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Pesanan', // Diubah ke Bahasa Indonesia
+                'Pesanan',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -374,7 +459,7 @@ class _PaymentDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total Harga', // Diubah ke Bahasa Indonesia
+                'Total Harga',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -406,7 +491,7 @@ class _PaymentDetail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Kembalian', // Diubah ke Bahasa Indonesia
+                'Kembalian',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               Text(

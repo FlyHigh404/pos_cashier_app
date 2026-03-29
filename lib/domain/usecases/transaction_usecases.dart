@@ -66,3 +66,13 @@ class DeleteTransactionUsecase extends Usecase<Result<void>, int> {
   @override
   Future<Result<void>> call(int params) async => _transactionRepository.deleteTransaction(params);
 }
+
+class SoftDeleteTransactionUsecase extends Usecase<Result<void>, int> {
+  SoftDeleteTransactionUsecase(this._transactionRepository);
+
+  final TransactionRepository _transactionRepository;
+
+  @override
+  Future<Result<void>> call(int params) async => _transactionRepository.softDeleteTransaction(params);
+}
+

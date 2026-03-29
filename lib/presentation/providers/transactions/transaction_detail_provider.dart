@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/common/result.dart';
 import '../../../domain/entities/transaction_entity.dart';
 import '../../../domain/repositories/transaction_repository.dart';
 import '../../../domain/usecases/transaction_usecases.dart';
@@ -25,6 +26,19 @@ class TransactionDetailProvider extends ChangeNotifier {
     } else {
       throw res.error ?? 'Failed to load data';
     }
+  }
+
+  Future<Result<void>> softDeleteTransaction(int id) async {
+    var res = await SoftDeleteTransactionUsecase(transactionRepository).call(id);
+
+    if (res.isSuccess) {
+      if (currentTransaction?.id == id) {
+        currentTransaction = null;
+        notifyListeners();
+      }
+    }
+
+    return res;
   }
   
   void clearTransaction() {
