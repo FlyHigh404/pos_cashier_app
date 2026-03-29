@@ -1,8 +1,7 @@
 import 'dart:io';
 
-import 'package:app_image/app_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -33,6 +32,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final nameController = TextEditingController();
   final priceController = TextEditingController();
   final descController = TextEditingController();
+  bool _isPickingImage = false;
 
   @override
   void initState() {
@@ -56,32 +56,48 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   }
 
   void onTapImage() async {
-    final pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 50, // This helps avoid Firebase upload timeouts
-    );
+    if (_isPickingImage) return;
 
-    if (pickedFile == null) return;
+    setState(() {
+      _isPickingImage = true;
+    });
+    
+    try{
+      final pickedFile = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50, // This helps avoid Firebase upload timeouts
+      );
 
-    // Crop the image to a 1:1 ratio (standard for product menus)
-    CroppedFile? croppedFile = await ImageCropper().cropImage(
-      sourcePath: pickedFile.path,
-      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Potong Gambar',
-          toolbarColor: Theme.of(context).colorScheme.primary,
-          toolbarWidgetColor: Colors.white,
-          initAspectRatio: CropAspectRatioPreset.square,
-          lockAspectRatio: true,
-        ),
-        IOSUiSettings(title: 'Potong Gambar'),
-      ],
-    );
+      if (pickedFile == null) return;
 
-    if (croppedFile != null) {
-      // Update the provider with the new file
-      ref.read(productFormControllerProvider).onChangedImage(File(croppedFile.path));
+      // Crop the image to a 1:1 ratio (standard for product menus)
+      CroppedFile? croppedFile = await ImageCropper().cropImage(
+        sourcePath: pickedFile.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Potong Gambar',
+            toolbarColor: Theme.of(context).colorScheme.primary,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(title: 'Potong Gambar'),
+        ],
+      );
+
+      if (croppedFile != null) {
+        // Update the provider with the new file
+        ref.read(productFormControllerProvider).onChangedImage(File(croppedFile.path));
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingImage = false;
+        });
+      }
     }
   }
 
@@ -187,8 +203,9 @@ class _ImageSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final imageFile = ref.watch(productFormControllerProvider.select((p) => p.imageFile));
-    final imageUrl = ref.watch(productFormControllerProvider.select((p) => p.imageUrl));
+    final provider = ref.watch(productFormControllerProvider);
+    final imageFile = provider.imageFile;
+    final imageUrl = provider.imageUrl;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,44 +213,72 @@ class _ImageSection extends ConsumerWidget {
         Text(
           'Gambar Menu',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+                fontWeight: FontWeight.bold,
+              ),
         ),
         const SizedBox(height: AppSizes.padding / 2),
         Stack(
           children: [
             GestureDetector(
-              // FIXED: Use an anonymous function or the callback passed from parent
-              onTap: onTapImage, 
-              child: AppImage(
-                // Logic: Prioritize local file (newly picked) over network URL (existing)
-                image: imageFile?.path ?? imageUrl ?? '',
-                imgProvider: imageFile != null ? ImgProvider.fileImage : ImgProvider.networkImage,
-                width: 100,
-                height: 100,
-                borderRadius: BorderRadius.circular(AppSizes.radius),
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                border: Border.all(
-                  width: 1,
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                ),
-                errorWidget: Icon(
-                  Icons.image,
-                  color: Theme.of(context).colorScheme.surfaceDim,
-                  size: 32,
+              onTap: onTapImage,
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(AppSizes.radius),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSizes.radius - 1),
+                    child: imageFile != null
+                        ? Image.file(
+                            imageFile,
+                            fit: BoxFit.cover,
+                          )
+                        : (imageUrl != null && imageUrl.isNotEmpty)
+                            ? (imageUrl.startsWith('http')
+                                ? CachedNetworkImage(
+                                    imageUrl: imageUrl,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => const Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                    errorWidget: (context, url, error) => Icon(
+                                      Icons.image_not_supported,
+                                      color: Theme.of(context).colorScheme.surfaceDim,
+                                      size: 40,
+                                    ),
+                                  )
+                                : Image.file(
+                                    File(imageUrl),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Icon(
+                                      Icons.broken_image,
+                                      color: Theme.of(context).colorScheme.surfaceDim,
+                                      size: 40,
+                                    ),
+                                  ))
+                            : Icon(
+                                Icons.add_photo_alternate_rounded,
+                                color: Theme.of(context).colorScheme.outlineVariant,
+                                size: 48,
+                              ),
+                  ),
                 ),
               ),
             ),
             Positioned(
-              right: 8,
-              bottom: 8,
+              right: 12,
+              bottom: 12,
               child: AppIconButton(
                 icon: Icons.camera_alt_rounded,
-                iconSize: 14,
+                iconSize: 18,
                 borderRadius: 8,
-                padding: const EdgeInsets.all(6),
-                // FIXED: Same here
-                onTap: onTapImage, 
+                padding: const EdgeInsets.all(8),
+                onTap: onTapImage,
               ),
             ),
           ],
@@ -242,6 +287,7 @@ class _ImageSection extends ConsumerWidget {
     );
   }
 }
+
 class _NameField extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
@@ -298,6 +344,9 @@ class _CategoryDropdown extends ConsumerWidget {
     final selectedId = ref.watch(productFormControllerProvider.select((p) => p.categoryId));
     final formController = ref.read(productFormControllerProvider);
 
+    final isSelectedIdValid = categories.any((cat) => cat.id == selectedId);
+    final safeSelectedId = isSelectedIdValid ? selectedId : null;
+
     return Padding(
       padding: const EdgeInsets.only(top: AppSizes.padding),
       child: Column(
@@ -311,7 +360,7 @@ class _CategoryDropdown extends ConsumerWidget {
           ),
           const SizedBox(height: AppSizes.padding / 2),
           DropdownButtonFormField<int>(
-            value: selectedId,
+            value: safeSelectedId,
             hint: const Text('Pilih Kategori'),
             isExpanded: true,
             decoration: InputDecoration(
@@ -421,12 +470,13 @@ class _CreateOrUpdateButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isFormValid = ref.watch(productFormControllerProvider.select((p) => p.isFormValid()));
+    final provider = ref.watch(productFormControllerProvider);
+    final isFormValid = provider.isFormValid();
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSizes.padding * 1.5),
       child: AppButton(
-        text: id == null ? 'Tambah Produk' : 'Edit Produk',
+        text: id == null ? 'Tambah Produk' : 'Simpan Perubahan',
         enabled: isFormValid,
         onTap: () {
           if (id != null) {

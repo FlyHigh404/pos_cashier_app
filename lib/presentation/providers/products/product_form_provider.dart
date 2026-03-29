@@ -70,10 +70,12 @@ class ProductFormProvider extends ChangeNotifier {
 
       if (imageFile != null) {
         final res = await UploadProductImageUsecase(storageRepository).call(imageFile!.path);
-        imageUrl = res.data;
+        if (res.isSuccess) {
+          imageUrl = res.data;
+        } else {
+          throw res.error ?? 'Gagal menyimpan gambar';
+        }
       }
-
-      cl('imageUrl $imageUrl');
 
       var product = ProductEntity(
         createdById: userId,
@@ -92,31 +94,29 @@ class ProductFormProvider extends ChangeNotifier {
 
       return res;
     } catch (e) {
-      return Result.failure(error: e);
+      return Result.failure(error: e.toString());
     }
   }
 
   Future<Result<void>> updatedProduct(int id) async {
     try {
       var userId = authProvider.user?.id;
-      if (userId == null) throw 'Unathenticated!';
+      if (userId == null) throw 'Unauthenticated!';
 
       if (imageFile != null) {
-      final res = await UploadProductImageUsecase(storageRepository).call(imageFile!.path);
-      if (res.isSuccess) {
-        imageUrl = res.data;
-      } else {
-        throw res.error ?? 'Failed to upload new image';
+        final res = await UploadProductImageUsecase(storageRepository).call(imageFile!.path);
+        if (res.isSuccess) {
+          imageUrl = res.data;
+        } else {
+          throw res.error ?? 'Gagal menyimpan gambar';
+        }
       }
-    }
-
-      cl('imageUrl $imageUrl');
 
       var product = ProductEntity(
         id: id,
         createdById: userId,
         categoryId: categoryId,
-        name: name!,
+        name: name ?? '',
         imageUrl: imageUrl ?? '',
         isAvailable: isAvailable ?? false,
         price: price ?? 0,
@@ -124,13 +124,10 @@ class ProductFormProvider extends ChangeNotifier {
       );
 
       var res = await UpdateProductUsecase(productRepository).call(product);
-
-      // Refresh products
       productsProvider.getAllProducts();
-
       return res;
     } catch (e) {
-      return Result.failure(error: e);
+      return Result.failure(error: e.toString()); // Safe error string
     }
   }
 
