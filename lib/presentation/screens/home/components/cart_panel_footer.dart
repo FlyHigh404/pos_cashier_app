@@ -159,14 +159,21 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
   Widget _buildShortcutButton(String label, int amount, HomeProvider provider, {bool isUangPas = false}) {
     final count = _shortcutCounts[amount] ?? 0;
 
+    final int currentReceived = int.tryParse(_amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final int totalAmount = provider.getTotalAmount();
+
+    final bool isActive = isUangPas 
+        ? (currentReceived == totalAmount && totalAmount > 0) 
+        : (count > 0);
+
     return Expanded(
       child: InkWell(
         onTap: () {
           int newAmount;
 
           if (isUangPas) {
-            newAmount = amount;
-            _shortcutCounts.clear(); // Reset all counters if Uang Pas is tapped
+            newAmount = totalAmount;
+            // _shortcutCounts.clear(); // Reset all counters if Uang Pas is tapped
           } else {
             final currentAmount = int.tryParse(_amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
             newAmount = currentAmount + amount;
@@ -189,10 +196,10 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
                     ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5)
                     : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 border: Border.all(
-                    color: count > 0 
+                    color: isActive 
                         ? Theme.of(context).colorScheme.primary 
                         : Theme.of(context).colorScheme.outlineVariant, 
-                    width: count > 0 ? 1 : 0.5),
+                    width: isActive ? 1 : 0.5),
                 borderRadius: BorderRadius.circular(4),
               ),
               alignment: Alignment.center,
