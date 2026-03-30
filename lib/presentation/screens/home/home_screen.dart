@@ -181,7 +181,7 @@ class _Body extends ConsumerWidget {
                     sliver: SliverGrid.builder(
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 200,
-                        childAspectRatio: 1 / 1.35,
+                        childAspectRatio: 1 / 1.34,
                         crossAxisSpacing: 8.0,
                         mainAxisSpacing: 8.0,
                       ),

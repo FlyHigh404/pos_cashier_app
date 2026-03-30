@@ -126,9 +126,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     sliver: SliverGrid.builder(
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 200,
-                        childAspectRatio: 1 / 1.5,
-                        crossAxisSpacing: AppSizes.padding / 2,
-                        mainAxisSpacing: AppSizes.padding / 2,
+                        childAspectRatio: 1 / 1.28,
+                        crossAxisSpacing: 8.0,
+                        mainAxisSpacing: 8.0,
                       ),
                       itemCount: allProducts.length,
                       itemBuilder: (context, i) {
