@@ -49,13 +49,13 @@ class _AboutScreenState extends State<AboutScreen> {
             children: [
               const AppImage(
                 image: Assets
-                    .welcome, 
+                    .appLogo,
                 imgProvider: ImgProvider.assetImage,
                 width: 150,
               ),
               const SizedBox(height: AppSizes.padding),
               Text(
-                'Kasir Bakso Idola', // Menggunakan nama aplikasi langsung
+                'Kasir Bakso Idola',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -78,14 +78,14 @@ class _AboutScreenState extends State<AboutScreen> {
               ),
               const SizedBox(height: AppSizes.padding),
               Text(
-                'Aplikasi Point of Sale (Kasir) modern yang dibangun menggunakan Flutter, dirancang khusus untuk kemudahan dan kecepatan transaksi.', // Diubah & Disesuaikan
+                'Aplikasi Point of Sale (Kasir) modern yang dirancang khusus untuk kemudahan dan kecepatan transaksi.', // Diubah & Disesuaikan
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              const SizedBox(height: AppSizes.padding * 2),
+              const SizedBox(height: AppSizes.padding * 1),
               Text(
-                "Aplikasi ini mengutamakan fitur offline-first, di mana seluruh data disimpan secara lokal (SQLite) sehingga transaksi tetap bisa berjalan lancar meskipun tidak ada sinyal internet.\n\nSistem akan secara otomatis menyinkronkan data dengan database pusat (Firestore) ketika perangkat kembali terhubung ke internet, memastikan data keuangan Anda selalu aman dan terbarui.", // Diubah & Disesuaikan
-                textAlign: TextAlign.justify,
+                "Aplikasi ini mengutamakan fitur offline-first, di mana seluruh data disimpan secara lokal sehingga transaksi tetap bisa berjalan lancar meskipun tidak ada sinyal internet.\n\nSistem akan secara otomatis menyinkronkan data dengan database pusat (cloud) ketika perangkat kembali terhubung ke internet, memastikan data keuangan Anda selalu aman dan terbarui.", // Diubah & Disesuaikan
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: AppSizes.padding * 2),
@@ -95,7 +95,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Dikembangkan dengan ❤️ oleh",
+                    "Dikembangkan oleh",
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
