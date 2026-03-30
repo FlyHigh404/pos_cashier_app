@@ -158,83 +158,136 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
 
   Widget _buildShortcutButton(String label, int amount, HomeProvider provider, {bool isUangPas = false}) {
     final count = _shortcutCounts[amount] ?? 0;
-
+    
     final int currentReceived = int.tryParse(_amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
     final int totalAmount = provider.getTotalAmount();
-
+    
     final bool isActive = isUangPas 
         ? (currentReceived == totalAmount && totalAmount > 0) 
         : (count > 0);
 
     return Expanded(
-      child: InkWell(
-        onTap: () {
-          int newAmount;
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5)
+                  : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              border: Border.all(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.outlineVariant,
+                  width: isActive ? 1 : 0.5),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            
+            child: Material(
+              color: Colors.transparent,
+              child: Row(
+                children: [
+                  if (count > 0 && !isUangPas)
+                    InkWell(
+                      onTap: () {
+                        // Subtract Logic
+                        int newAmount = currentReceived - amount;
+                        if (newAmount < 0) newAmount = 0;
+                        
+                        _shortcutCounts[amount] = count - 1;
+                        if (_shortcutCounts[amount]! <= 0) {
+                          _shortcutCounts.remove(amount);
+                        }
+                        
+                        _amountController.text = newAmount > 0 ? newAmount.toString() : '';
+                        provider.onChangedReceivedAmount(newAmount);
+                        setState(() {});
+                      },
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(3)),
+                      child: Container(
+                        width: 26,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            right: BorderSide(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4), 
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.remove,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                    
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        // Add Logic
+                        int newAmount;
 
-          if (isUangPas) {
-            newAmount = totalAmount;
-            // _shortcutCounts.clear(); // Reset all counters if Uang Pas is tapped
-          } else {
-            final currentAmount = int.tryParse(_amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-            newAmount = currentAmount + amount;
-            _shortcutCounts[amount] = count + 1; // Increment the specific button counter
-          }
+                        if (isUangPas) {
+                          newAmount = totalAmount;
+                          _shortcutCounts.clear();
+                        } else {
+                          newAmount = currentReceived + amount;
+                          _shortcutCounts[amount] = count + 1;
+                        }
 
-          _amountController.text = newAmount.toString();
-          provider.onChangedReceivedAmount(newAmount);
-          setState(() {}); 
-        },
-        borderRadius: BorderRadius.circular(4),
-        child: Stack(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                // Change color slightly if it has been tapped!
-                color: count > 0 
-                    ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5)
-                    : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                border: Border.all(
-                    color: isActive 
-                        ? Theme.of(context).colorScheme.primary 
-                        : Theme.of(context).colorScheme.outlineVariant, 
-                    width: isActive ? 1 : 0.5),
-                borderRadius: BorderRadius.circular(4),
+                        _amountController.text = newAmount.toString();
+                        provider.onChangedReceivedAmount(newAmount);
+                        setState(() {});
+                      },
+                      borderRadius: count > 0 && !isUangPas
+                          ? const BorderRadius.horizontal(right: Radius.circular(3))
+                          : BorderRadius.circular(3),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                        alignment: Alignment.center,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            label,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+            ),
+          ),
+          
+          if (count > 0 && !isUangPas)
+            Positioned(
+              top: -6,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
+                ),
+                child: Text(
+                  'x$count',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-            
-            // Show counter
-            if (count > 0 && !isUangPas)
-              Positioned(
-                top: 2,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'x$count',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
