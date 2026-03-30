@@ -342,7 +342,7 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Pintasan Tunai',
+                        'Pintasan Uang Tunai',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: Theme.of(context).colorScheme.outline,
                           fontWeight: FontWeight.bold,
@@ -359,9 +359,9 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
                           child: Text(
-                            'Kosongkan',
+                            'Ulangi',
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.outlineVariant,
+                              color: Theme.of(context).colorScheme.outline,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -373,24 +373,30 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
                 Row(
                   children: [
                     _buildShortcutButton('Uang Pas', totalAmount, provider, isUangPas: true),
-                    const SizedBox(width: 6),
-                    _buildShortcutButton('1k', 1000, provider),
-                    const SizedBox(width: 6),
-                    _buildShortcutButton('2k', 2000, provider),
-                    const SizedBox(width: 6),
-                    _buildShortcutButton('5k', 5000, provider),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    _buildShortcutButton('10k', 10000, provider),
+                    _buildShortcutButton('Rp 500', 500, provider),
                     const SizedBox(width: 6),
-                    _buildShortcutButton('20k', 20000, provider),
+                    _buildShortcutButton('Rp 1 ribu', 1000, provider),
                     const SizedBox(width: 6),
-                    _buildShortcutButton('50k', 50000, provider),
+                    _buildShortcutButton('Rp 2 ribu', 2000, provider),
                     const SizedBox(width: 6),
-                    _buildShortcutButton('100k', 100000, provider),
+                    _buildShortcutButton('Rp 5 ribu', 5000, provider),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _buildShortcutButton('Rp 10 ribu', 10000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('Rp 20 ribu', 20000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('Rp 50 rb', 50000, provider),
+                    const SizedBox(width: 6),
+                    _buildShortcutButton('Rp 100 rb', 100000, provider),
                   ],
                 ),
               ],
