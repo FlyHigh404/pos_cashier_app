@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/di/app_providers.dart';
 import '../../../core/themes/app_colors.dart';
@@ -63,6 +64,60 @@ class TransactionDetailScreen extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Gagal membatalkan transaksi: ${result.error}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _hardDeleteTransaction(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Permanen?'),
+        content: const Text(
+          'Transaksi ini akan dihapus secara permanen dari sistem dan tidak dapat dikembalikan. Apakah Anda yakin?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya, Hapus', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Memproses penghapusan permanen...')),
+    );
+    final controller = ref.read(transactionDetailControllerProvider);
+    
+    final result = await controller.deleteTransaction(id); 
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transaksi berhasil dihapus permanen'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      
+      context.pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menghapus transaksi: ${result.error}'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
@@ -192,7 +247,16 @@ class TransactionDetailScreen extends ConsumerWidget {
                     buttonColor: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
                     borderColor: Colors.transparent,
                     onTap: () => _voidTransaction(context, ref),
+                  )
+                else
+                  AppButton(
+                    text: 'Hapus Permanen Data Transaksi',
+                    textColor: Colors.white,
+                    buttonColor: Theme.of(context).colorScheme.error,
+                    borderColor: Colors.transparent,
+                    onTap: () => _hardDeleteTransaction(context, ref),
                   ),
+                  
                 const SizedBox(height: AppSizes.padding * 2),
               ],
             ),
@@ -282,7 +346,6 @@ class _StatusSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🚀 Change UI based on whether it is deleted or not
     final isDeleted = status == 'deleted';
 
     return Column(

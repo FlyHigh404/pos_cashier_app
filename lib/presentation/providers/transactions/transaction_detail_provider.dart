@@ -44,4 +44,17 @@ class TransactionDetailProvider extends ChangeNotifier {
   void clearTransaction() {
     currentTransaction = null;
   }
+
+  Future<Result<void>> deleteTransaction(int id) async {
+    var res = await DeleteTransactionUsecase(transactionRepository).call(id);
+
+    if (res.isSuccess) {
+      if (currentTransaction?.id == id) {
+        currentTransaction = null;
+        notifyListeners();
+      }
+    }
+
+    return res;
+  }
 }
