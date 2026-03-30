@@ -218,7 +218,7 @@ class _Title extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.asset(
-            'assets/app-icon.png', // Uses your local launcher icon
+            'assets/app_icon.png', // Uses your local launcher icon
             width: 32,
             height: 32,
             fit: BoxFit.cover,
