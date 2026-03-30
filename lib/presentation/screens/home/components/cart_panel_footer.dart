@@ -85,6 +85,7 @@ class _PayButton extends ConsumerWidget {
           AppDialog.show(
             child: const _AdditionalInfoDialog(),
             showButtons: false,
+            dismissible: false,
           );
         } else {
           /// Expands cart panel
@@ -483,8 +484,28 @@ class _AdditionalInfoDialogState extends ConsumerState<_AdditionalInfoDialog> {
                 buttonColor: Theme.of(context).colorScheme.errorContainer,
                 borderColor: Theme.of(context).colorScheme.error,
                 textColor: Theme.of(context).colorScheme.error,
-                onTap: () {
-                  context.pop();
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Batalkan Pembayaran?'),
+                      content: const Text('Input nominal pembayaran akan direset. Apakah Anda yakin?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Tidak', style: TextStyle(color: Colors.grey)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Ya, Batal', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true && context.mounted) {
+                    context.pop();
+                  }
                 },
               ),
             ),
