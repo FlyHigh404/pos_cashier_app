@@ -24,6 +24,7 @@ class TransactionsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+
   Future<void> getAllTransactions({int? offset, String? contains}) async {
     var userId = authProvider.user?.id;
     if (userId == null) throw 'Unathenticated!';

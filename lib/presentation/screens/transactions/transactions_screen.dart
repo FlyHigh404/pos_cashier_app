@@ -44,8 +44,15 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
   void scrollListener() async {
     final transactionProvider = ref.read(transactionsControllerProvider);
-    if (scrollController.offset == scrollController.position.maxScrollExtent) {
-      await transactionProvider.getAllTransactions(offset: transactionProvider.allTransactions?.length);
+    
+    if (scrollController.position.pixels >= scrollController.position.maxScrollExtent - 50) {
+      
+      if (!transactionProvider.isLoadingMore &&
+          transactionProvider.allTransactions != null &&
+          transactionProvider.allTransactions!.isNotEmpty) {
+            
+        await transactionProvider.getAllTransactions(offset: transactionProvider.allTransactions!.length);
+      }
     }
   }
 

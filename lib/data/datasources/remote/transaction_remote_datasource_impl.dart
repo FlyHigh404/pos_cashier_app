@@ -279,7 +279,7 @@ class TransactionRemoteDatasourceImpl extends TransactionDatasource {
           .limit(limit);
 
 
-      if (offset != null) {
+      if (offset != null && offset > 0) {
         var temp = await _firebaseFirestore
             .collection('Transaction')
             .where('createdById', isEqualTo: userId)

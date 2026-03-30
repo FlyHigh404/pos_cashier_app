@@ -36,7 +36,7 @@ class TransParams<T> extends Equatable {
     this.param,
     this.orderBy = 'createdAt',
     this.sortBy = 'DESC',
-    this.limit = 10000,
+    this.limit = 100,
     this.offset,
     this.contains,
     this.categoryId,
