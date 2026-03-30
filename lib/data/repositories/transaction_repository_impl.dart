@@ -156,7 +156,7 @@ class TransactionRepositoryImpl extends TransactionRepository {
     try {
       
       var data = TransactionModel.fromEntity(transaction);
-      data.status = 'success';
+      data.status = 'pending';
 
       if (data.id == null || data.id == 0 || data.id.toString().length > 12) {
         final now = DateTime.now();

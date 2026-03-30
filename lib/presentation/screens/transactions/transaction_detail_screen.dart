@@ -155,7 +155,7 @@ class TransactionDetailScreen extends ConsumerWidget {
 
     if (!context.mounted) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
       if (result.isFailure) {
@@ -173,6 +173,10 @@ class TransactionDetailScreen extends ConsumerWidget {
           ),
         );
       } else {
+        if (transaction.status == 'pending') {
+          await ref.read(transactionDetailControllerProvider).markAsSuccess(transaction);
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Struk berhasil dicetak!'),
@@ -188,6 +192,7 @@ class TransactionDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTransaction = ref.watch(transactionDetailControllerProvider).currentTransaction;
     final isDeleted = currentTransaction?.status == 'deleted';
+    final isPending = currentTransaction?.status == 'pending';
 
     return Scaffold(
       appBar: AppBar(
@@ -266,6 +271,7 @@ class TransactionDetailScreen extends ConsumerWidget {
       bottomNavigationBar: currentTransaction == null
           ? null 
           : _BuildPrintButton(
+              isPending: isPending,
               onPressed: isDeleted ? null : () async {
                 final bool? confirm = await _showConfirmDialog(context);
                 if (confirm == true) {
@@ -293,8 +299,9 @@ class TransactionDetailScreen extends ConsumerWidget {
 
 class _BuildPrintButton extends StatelessWidget {
   final VoidCallback? onPressed;
+  final bool isPending;
 
-  const _BuildPrintButton({required this.onPressed});
+  const _BuildPrintButton({required this.onPressed, this.isPending = false});
 
   @override
   Widget build(BuildContext context) {
@@ -311,28 +318,59 @@ class _BuildPrintButton extends StatelessWidget {
         ],
       ), 
       child: SafeArea(
-        child: ElevatedButton.icon(
-          onPressed: onPressed,
-          icon: const Icon(Icons.print_rounded, size: 28),
-          label: const Text(
-            'CETAK STRUK',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // Prevents taking up whole screen
+          children: [
+            if (isPending)
+              Container(
+                margin: const EdgeInsets.only(bottom: AppSizes.padding),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade700.withValues(alpha: 0.15),
+                  border: Border.all(color: Colors.orange.shade700.withValues(alpha: 0.5)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Klik tombol di bawah untuk cetak struk & selesaikan transaksi.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.orange.shade900,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            ElevatedButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.print_rounded, size: 28),
+              label: Text(
+                isPending ? 'CETAK SEKARANG' : 'CETAK ULANG STRUK', // Dynamic label
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                disabledBackgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                disabledForegroundColor: Theme.of(context).colorScheme.outline, 
+                minimumSize: const Size(double.infinity, 60),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSizes.radius),
+                ),
+                elevation: onPressed == null ? 0 : 2, 
+              ),
             ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            disabledBackgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest, // 🚀 Disabled bg color
-            disabledForegroundColor: Theme.of(context).colorScheme.outline, // 🚀 Disabled text color
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radius),
-            ),
-            elevation: onPressed == null ? 0 : 2, // Remove shadow when disabled
-          ),
+          ],
         ),
       ),
     );
@@ -347,23 +385,56 @@ class _StatusSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDeleted = status == 'deleted';
+    final isPending = status == 'pending';
+
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+    String? hintText;
+
+    if (isDeleted) {
+      statusColor = Theme.of(context).colorScheme.error;
+      statusIcon = Icons.cancel_rounded;
+      statusText = 'Transaksi Dibatalkan';
+    } else if (isPending) {
+      statusColor = Colors.orange.shade700;
+      statusIcon = Icons.print_rounded;
+      statusText = 'Menunggu Dicetak';
+      hintText = 'Pencetakan struk diperlukan untuk\nmenyelesaikan transaksi ini.';
+    } else {
+      statusColor = AppColors.green;
+      statusIcon = Icons.check_circle_outline_rounded;
+      statusText = 'Transaksi Berhasil';
+    }
 
     return Column(
       children: [
         Icon(
-          isDeleted ? Icons.cancel_rounded : Icons.check_circle_outline_rounded,
-          color: isDeleted ? Theme.of(context).colorScheme.error : AppColors.green,
+          statusIcon,
+          color: statusColor,
           size: 60,
         ),
         const SizedBox(height: AppSizes.padding / 2),
         Text(
-          isDeleted ? 'Transaksi Dibatalkan' : 'Transaksi Berhasil',
+          statusText,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: isDeleted ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.onSurface,
+                color: statusColor,
               ),
         ),
+        if (hintText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              hintText,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: statusColor.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
       ],
     );
   }

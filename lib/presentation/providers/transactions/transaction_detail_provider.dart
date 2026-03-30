@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/common/result.dart';
+import '../../../data/models/transaction_model.dart';
 import '../../../domain/entities/transaction_entity.dart';
 import '../../../domain/repositories/transaction_repository.dart';
 import '../../../domain/usecases/transaction_usecases.dart';
@@ -56,5 +57,29 @@ class TransactionDetailProvider extends ChangeNotifier {
     }
 
     return res;
+  }
+
+  
+
+  Future<void> markAsSuccess(TransactionEntity transaction) async {
+    try {
+      final model = TransactionModel.fromEntity(transaction);
+      final jsonMap = model.toJson();
+      
+      jsonMap['status'] = 'success';
+      
+      final updatedModel = TransactionModel.fromJson(jsonMap).toEntity();
+      
+      var res = await UpateTransactionUsecase(transactionRepository).call(updatedModel);
+      
+      if (res.isSuccess) {
+        currentTransaction = updatedModel;
+        notifyListeners();
+      } else {
+        debugPrint('Gagal update status: ${res.error}');
+      }
+    } catch (e) {
+      debugPrint('Gagal update status: $e');
+    }
   }
 }

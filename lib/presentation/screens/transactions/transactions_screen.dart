@@ -151,6 +151,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                             (context, index) {
                               final transaction = transactions[index];
                               final isDeleted = transaction.status == 'deleted';
+                              final isPending = transaction.status == 'pending';
 
                               return Opacity(
                                 opacity: isDeleted ? 0.35 : 1.0,
@@ -170,6 +171,28 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                                           ),
                                           child: const Text(
                                             'BATAL',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                    if (isPending)
+                                      Positioned(
+                                        top: 12,
+                                        right: 12,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            'PENDING',
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontSize: 9,
