@@ -36,6 +36,18 @@ class AccountScreen extends StatelessWidget {
 
             const SizedBox(height: AppSizes.padding * 2),
             const Divider(),
+
+            Text(
+              'Printer',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 8),
+
+            const _PrinterSettingsButton(),
+
             const SizedBox(height: AppSizes.padding),
 
             Text(
@@ -53,7 +65,7 @@ class AccountScreen extends StatelessWidget {
               onTap: () => context.push('/account/sync-data'),
             ),
             
-            const SizedBox(height: AppSizes.padding * 2),
+            const SizedBox(height: AppSizes.padding),
             
             Text(
               'PENGATURAN APLIKASI',
@@ -68,7 +80,6 @@ class AccountScreen extends StatelessWidget {
             const _ManageCategoriesButton(),
             
             const _ThemeButton(),
-            const _PrinterSettingsButton(),
             const _AboutButton(),
             
             const SizedBox(height: AppSizes.padding * 2),
