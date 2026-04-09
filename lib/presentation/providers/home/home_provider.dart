@@ -64,7 +64,7 @@ class HomeProvider extends ChangeNotifier {
 
       if (res.isSuccess) {
         // Auto print receipt (fire-and-forget, ignore failure)
-        printerService.printTransaction(transaction);
+        // printerService.printTransaction(transaction);
       }
 
       panelController.close();
