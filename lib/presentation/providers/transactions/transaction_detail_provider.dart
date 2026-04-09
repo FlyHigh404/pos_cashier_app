@@ -30,7 +30,9 @@ class TransactionDetailProvider extends ChangeNotifier {
   }
 
   Future<Result<void>> softDeleteTransaction(int id) async {
-    var res = await SoftDeleteTransactionUsecase(transactionRepository).call(id);
+    var res = await SoftDeleteTransactionUsecase(
+      transactionRepository,
+    ).call(id);
 
     if (res.isSuccess) {
       if (currentTransaction?.id == id) {
@@ -41,7 +43,7 @@ class TransactionDetailProvider extends ChangeNotifier {
 
     return res;
   }
-  
+
   void clearTransaction() {
     currentTransaction = null;
   }
@@ -59,27 +61,26 @@ class TransactionDetailProvider extends ChangeNotifier {
     return res;
   }
 
-  
-
   Future<void> markAsSuccess(TransactionEntity transaction) async {
     try {
       final model = TransactionModel.fromEntity(transaction);
-      final jsonMap = model.toJson();
-      
-      jsonMap['status'] = 'success';
-      
-      final updatedModel = TransactionModel.fromJson(jsonMap).toEntity();
-      
-      var res = await UpateTransactionUsecase(transactionRepository).call(updatedModel);
-      
+
+      model.status = 'success';
+
+      final updatedEntity = model.toEntity();
+
+      var res = await UpateTransactionUsecase(
+        transactionRepository,
+      ).call(updatedEntity);
+
       if (res.isSuccess) {
-        currentTransaction = updatedModel;
+        currentTransaction = updatedEntity;
         notifyListeners();
       } else {
         debugPrint('Gagal update status: ${res.error}');
       }
     } catch (e) {
-      debugPrint('Gagal update status: $e');
+      debugPrint('Gagal update status (CRASH): $e');
     }
   }
 }
